@@ -52,6 +52,7 @@ pub fn play_bell(sound_file: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+slint::include_modules!();
 fn main() -> Result<(), Box<dyn Error>> {
     let args = if Path::new("./config.json").exists() {
         serde_json::from_str(&fs::read_to_string("./config.json")?)?
@@ -60,6 +61,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     if args.use_gui {
+        HelloWorld::new().unwrap().run().unwrap();
+
         Ok(())
     } else {
         console::console(args)
