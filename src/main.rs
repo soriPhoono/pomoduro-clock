@@ -1,33 +1,49 @@
-use std::{
-    error::Error,
-    io::{stdout, Write},
-    thread,
-    time::Duration,
-};
+mod console;
+mod ui;
 
-use rodio::source::{SineWave, Source};
+use std::{error::Error, fs, path::Path};
+
+use rodio::source::Source;
 use rodio::{Decoder, OutputStream, Sink};
 
 use clap::Parser;
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, serde::Deserialize)]
 #[command(author = "SoriPhoono", version = "1.0", about = "A pomodoro timer", long_about=None)]
-struct Args {
+pub struct Args {
+    #[cfg(debug_assertions)]
+    #[arg(short, long, default_value = "1")]
+    productive_time: u32,
+    #[cfg(not(debug_assertions))]
     #[arg(short, long, default_value = "15")]
-    productive_time: f32,
+    productive_time: u32,
+
+    #[cfg(debug_assertions)]
+    #[arg(short, long, default_value = "1")]
+    break_time: u32,
+    #[cfg(not(debug_assertions))]
     #[arg(short, long, default_value = "15")]
-    break_time: f32,
+    break_time: u32,
+
+    #[cfg(debug_assertions)]
+    #[arg(short, long, default_value = "1")]
+    cycles: u32,
+    #[cfg(not(debug_assertions))]
     #[arg(short, long, default_value = "4")]
-    cycles: f32,
+    cycles: u32,
+
     #[arg(short, long, default_value = "./config/bell.wav")]
     sound_file: String,
+
+    #[arg(short, long, default_value = "false")]
+    use_gui: bool,
 }
 
-fn play_bell(sound_file: &str) -> Result<(), Box<dyn Error>> {
+pub fn play_bell(sound_file: &str) -> Result<(), Box<dyn Error>> {
     let (_stream, stream_handle) = OutputStream::try_default()?;
     let sink = Sink::try_new(&stream_handle)?;
 
-    let file = std::fs::File::open(sound_file)?;
+    let file = fs::File::open(sound_file)?;
     let source = Decoder::new(file)?.convert_samples::<f32>();
 
     sink.append(source);
@@ -37,23 +53,15 @@ fn play_bell(sound_file: &str) -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args = Args::parse();
+    let args = if Path::new("./config.json").exists() {
+        serde_json::from_str(&fs::read_to_string("./config.json")?)?
+    } else {
+        Args::parse()
+    };
 
-    println!(
-        "Begining timer for {} cycles of {} minutes of work and {} minutes of break",
-        args.cycles, args.productive_time, args.break_time
-    );
-
-    for cycle in 1..=args.cycles {
-        println!("Cycle {} of {}", cycle, args.cycles);
-        thread::sleep(Duration::from_secs(args.productive_time as u64 * 60));
-        play_bell(&args.sound_file)?;
-        println!("Break time!");
-
-        thread::sleep(Duration::from_secs(args.break_time as u64 * 60));
-        play_bell(&args.sound_file)?;
-        println!("Back to work!");
+    if args.use_gui {
+        Ok(())
+    } else {
+        console::console(args)
     }
-
-    Ok(())
 }
